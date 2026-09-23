@@ -4,6 +4,8 @@ const connectDB = require("../config/db");
 const Book = require("../models/Book");
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const { generatePlaceholderCover } = require("../utils/placeholderCover");   
+
 
 /**
  * Demo catalog: novels, biographies, textbooks, comics, self-help - at
@@ -39,6 +41,31 @@ const books = [
   { title: "Think Again", author: "Adam Grant", category: "Non-Fiction", description: "A book on the power of knowing what you don't know.", formats: [fmt("Paperback", 16, 7), fmt("E-Book", 8, 35)] },
 ];
 
+/**
+ * Uploads a generated placeholder cover to GridFS for every book that
+ * doesn't already have one, and links it via coverImageId.
+ */
+async function attachPlaceholderCovers() {
+  const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: "covers" });
+  const missing = await Book.find({ coverImageId: null });
+
+  for (const book of missing) {
+    const buffer = await generatePlaceholderCover(book);
+    const uploadStream = bucket.openUploadStream(`${book._id}.png`, {
+      metadata: { mimetype: "image/png" },
+    });
+    await new Promise((resolve, reject) => {
+      uploadStream.end(buffer, async (err) => {
+        if (err) return reject(err);
+        book.coverImageId = uploadStream.id;
+        await book.save();
+        resolve();
+      });
+    });
+  }
+  console.log(`Attached placeholder covers to ${missing.length} book(s).`);
+}
+
 async function seed() {
   await connectDB();
 
@@ -49,6 +76,7 @@ async function seed() {
     await Book.insertMany(books);
     console.log(`Inserted ${books.length} demo books.`);
   }
+  await attachPlaceholderCovers();
 
   // Convenience: create one admin account for managing the catalog
   const adminEmail = "admin@library.local";
@@ -62,6 +90,7 @@ async function seed() {
   await mongoose.disconnect();
   console.log("Seed complete.");
 }
+
 
 seed().catch((err) => {
   console.error(err);

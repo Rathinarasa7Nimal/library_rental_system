@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
 const User = require("../models/User");
+const { isValidPassword, PASSWORD_RULES_MESSAGE } = require("../utils/validators");
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -20,9 +21,11 @@ const sendAuthResponse = (res, statusCode, user) => {
   });
 };
 
+
 const register = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) throw new ApiError(400, "name, email, password are required");
+  if (!isValidPassword(password)) throw new ApiError(400, PASSWORD_RULES_MESSAGE);
 
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) throw new ApiError(409, "Email already registered");

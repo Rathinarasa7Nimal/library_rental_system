@@ -3,6 +3,7 @@ const Book = require("../models/Book");
 const createCrudController = require("../utils/controllerFactory");
 const asyncHandler = require("../utils/asyncHandler");
 const ApiError = require("../utils/ApiError");
+const { writeBufferToGridFS } = require("../utils/gridfs");
 
 // Reusable CRUD base: getAll handles search + filters + pagination already.
 // allowedFilters: category, format (format needs a bit of custom handling
@@ -65,9 +66,12 @@ const createBook = asyncHandler(async (req, res) => {
   if (typeof body.formats === "string") {
     body.formats = JSON.parse(body.formats);
   }
-  if (req.file && req.file.id) {
-    body.coverImageId = req.file.id;
-  }
+  if (req.file) {
+  body.coverImageId = await writeBufferToGridFS(req.file.buffer, {
+    filename: `${Date.now()}-${req.file.originalname}`,
+    mimetype: req.file.mimetype,
+  });
+}
   const book = await Book.create(body);
   res.status(201).json({ success: true, data: book });
 });
@@ -77,9 +81,12 @@ const updateBook = asyncHandler(async (req, res) => {
   if (typeof body.formats === "string") {
     body.formats = JSON.parse(body.formats);
   }
-  if (req.file && req.file.id) {
-    body.coverImageId = req.file.id;
-  }
+  if (req.file) {
+  body.coverImageId = await writeBufferToGridFS(req.file.buffer, {
+    filename: `${Date.now()}-${req.file.originalname}`,
+    mimetype: req.file.mimetype,
+  });
+}
   const book = await Book.findByIdAndUpdate(req.params.id, body, {
     new: true,
     runValidators: true,
